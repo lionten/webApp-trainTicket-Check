@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+	<link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+	<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+	<script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.js"></script>
+	<title>火车票查询</title>
+</head>
+<body>
+	<div data-role="page" id="index" data-position="fixed">
+		<div data-role="header">
+			<h1>列车时刻表查询</h1>
+		</div>
+		<div data-role="main" class="ui-content">
+			<!--表单-->
+			<from>
+				<div class="ui-field-contain" >
+					<label for="">发车站:</label>
+					<input type="text" id="search_begin">
+				</div>
+				<div class="ui-field-contain">
+					<label for="">终点站:</label>
+					<input type="text" id="search_end">
+				</div>
+				<div class="ui-field-contain">
+					<label for="">车次:</label>
+					<input type="text" id="search_no">
+				</div>
+				<input type="button" value="搜索" id="search_submit">
+				<!--显示车次列表-->
+				<ul id="list" data-role="listview" data-inset="true"></ul>
+			</from>
+		</div>
+		<div data-role="footer" data-position="fixed">
+			<div data-role="navbar">
+				<ul>
+					<li ><a href="" data-icon="grid" class="ui-btn-active">查询</a></li>
+					<li><a href="" data-icon="star">收藏</a></li>
+					<li><a href="" data-icon="gear">设置</a></li>
+				</ul>
+			</div>
+
+		</div>
+	</div>
+	<!--下一页：列车时刻表查询-->
+	<div data-role="page" id="detail">
+		<div data-role="header" data-position="fixed">
+			<h1>列车时刻表查询</h1>
+		</div>
+		<div data-role="main" class="ui-content">
+			<h2></h2>
+			<table data-role="table" data-mode="reflow" class="ui-responsive table-stroke">
+				<thead>
+				<tr>
+					<th>站名</th>
+					<th>到战时间</th>
+					<th>出发时间</th>
+				</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+			<a href="#" class="ui-btn ui-corner-all" data-rel="back">返回</a>
+
+		</div>
+	</div>
+<script>
+	//跨域中转
+	var urlPre = 'https://crossorigin.me/';
+	//站站查询
+	var url1='http://api.jisuapi.com/train/station2s?appkey=b5848797259c75c6&ishigh=0'
+	//车次查询
+	var url2 = 'http://apis.juhe.cn/train/s?key=84b071158ed95e5e847bf86d1e43c25f'
+	//获取车次列表，显示在当前页下面
+	var getTrainList = function () {
+		if($('#search_no').val()||$('#search_begin').val()&&$('#search_end').val()){
+//			alert('接下来的操作')
+			var search = $(this);
+			//搜索后，按钮禁止
+			search.button('option','disable',true)
+			$.mobile.loading('show')
+			//设置参数
+			var _data = {};
+			var url = url1;
+			if(!$('#search_no').val()){
+			    //站站查询
+				_data.start = $('#search_begin').val();
+				_data.end = $('#search_end').val();
+			}else{
+			    //车次查询
+				_data.trainno = $('#search_no').val();
+				url = url2;
+			}
+			//发起请求
+			$.ajax({
+				url:url,
+				data:_data,
+                dataType:'jsonp',
+				success:function (data) {
+					//console.log(data)
+					//将获取的数据插入到列表上
+					var list = $('#list');
+					var res = data.result;
+//					console.log(res)
+					var _arr = [];
+					$.each(res,function (index,_this) {
+						if(index>10){
+							return false
+						}
+//						var _this = $(this)
+						if(!_this){
+					    //没有找到相关结果
+							aler('数据没有找到')
+							return false
+                    	}else{
+						    var _li = '<li>' +
+								'<a href="#" data-no="'+_this.trainno+'">'+
+								'<h2>'+_this.trainno+'次</h2>'+
+								'<p class="station">'+_this.station+'-'+_this.endstation+'</p>'+
+								'<p class="time">用时：'+_this.costtime+'</p>'+
+								'<p class="ui-li-aside">'+_this.departuretime+'开</p>'
+								'</a></li>';
+						    _arr.push(_li)
+						}
+                    })
+					if(_arr.length>0){
+					    list.html(_arr.join(''))
+						list.listview('refresh')
+					}
+                    $.mobile.loading('hide')
+                    search.button('option','disable',false)
+
+                },
+				fail:function (error) {
+					console.log(error)
+                }
+			})
+
+		}else{
+		    alert('请输入发车站或终端站，或输入车次')
+		}
+    }
+
+	//获取车次详细信息，显示在另一页
+	var isAjax= false;
+	var getInfoByTrainCode = function () {
+		//防止车次被多次点击触发事件
+		if(isAjax){return};
+		isAjax = true;
+		$.mobile.loading('show');
+		var trainno = $(this).attr('data-no');
+		$.ajax({
+			url:url2,
+			data:{
+                name:trainno
+			},
+			dataType:'jsonp',
+			success:function (data) {
+			    console.log(data)
+				//获取详细数据
+				var station_list = data.result.station_list;
+				$('#detail').find('.ui-content h2').html(trainno+'次')
+				var tbody = $('#detail').find('.ui-content tbody');
+				tbody.html();
+
+				$.each(station_list,function (index, _this2) {
+					var tr = $('<tr></tr>');
+					tr.html('<td>'+_this2.station_name+'</td>'+
+							'<td>'+_this2.arrived_time+'</td>'+
+							'<td>'+_this2.leave_time+'</td>');
+					tbody.append(tr)
+                })
+				$.mobile.loading('hide');
+				isAjax = false;
+				$.mobile.changePage('#detail');
+
+            },
+			fail:function (err) {
+				alert(err)
+            }
+
+		})
+    }
+    //绑定事件
+	var bindEvent = function () {
+	    //点击搜索，获取车次列表
+		$('#search_submit').on('click',getTrainList)
+		//#list根据上述所获的车次动态生成，点击获取每个的详细信息
+		$('#list').on('click','a',getInfoByTrainCode)
+    }
+    bindEvent()
+
+//	$(document).on('pageinit','#index',function () {
+//		bindEvent()
+//    })
+</script>
+</body>
+</html>
